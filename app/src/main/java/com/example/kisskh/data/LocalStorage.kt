@@ -61,9 +61,20 @@ object LocalStorage {
     }
 
     fun addToHistory(episode: Episode) {
+        // Only add if watched for more than 5 seconds
+        if (episode.timestamp <= 5) {
+            // Don't modify history if episode hasn't been watched enough
+            return
+        }
+        
         val list = getHistory().toMutableList()
         // Remove existing entry for this episode if any (to update position to top)
         list.removeAll { it.id == episode.id }
+        // Remove any other episode from the same show (same movieId)
+        // This ensures that when a new episode starts, it replaces the old one in history
+        list.removeAll { it.movieId == episode.movieId && it.id != episode.id }
+        
+        // Add the episode to top
         list.add(0, episode)
         
         // Limit history size (e.g. 50 items)
@@ -74,7 +85,12 @@ object LocalStorage {
         prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
     }
 
-    fun updateHistoryProgress(episodeId: String, timestamp: Long, duration: Long) {
+    fun updateHistoryProgress(episodeId: String, timestamp: Long, duration: Long, episode: Episode? = null) {
+        // Only update if watched for more than 5 seconds
+        if (timestamp <= 5) {
+            return
+        }
+        
         val list = getHistory().toMutableList()
         val index = list.indexOfFirst { it.id == episodeId }
         
@@ -82,9 +98,29 @@ object LocalStorage {
             val oldEpisode = list[index]
             val newEpisode = oldEpisode.copy(timestamp = timestamp, duration = duration)
             
-            // Move to top to indicate recent activity
+            // Remove current episode first to avoid index shifting issues
             list.removeAt(index)
+            
+            // Remove any other episode from the same show (same movieId)
+            list.removeAll { it.movieId == oldEpisode.movieId }
+            
+            // Add updated episode to top
             list.add(0, newEpisode)
+            
+            prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
+        } else if (episode != null) {
+            // Episode not in history yet but watched >5s, and we have full episode data
+            // Remove any other episode from the same show (same movieId)
+            list.removeAll { it.movieId == episode.movieId }
+            
+            // Add the episode with updated timestamp and duration
+            val newEpisode = episode.copy(timestamp = timestamp, duration = duration)
+            list.add(0, newEpisode)
+            
+            // Limit history size
+            if (list.size > 50) {
+                list.removeAt(list.size - 1)
+            }
             
             prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
         }
