@@ -29,6 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
@@ -54,7 +57,8 @@ fun PlayerScreen(
     episodeId: String,
     episodeNumber: String,
     episodeTitle: String,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNextEpisode: ((String, String) -> Unit)? = null // movieId, currentEpisodeNumber
 ) {
     val context = LocalContext.current
     val isWeb = videoUrl.contains("kisskh.co")
@@ -70,6 +74,27 @@ fun PlayerScreen(
     var duration by remember { mutableStateOf(1f) } // Avoid div by zero
     var isBuffering by remember { mutableStateOf(true) }
     var controlsVisible by remember { mutableStateOf(true) }
+    
+    // Episode end detection
+    var hasEpisodeEnded by remember { mutableStateOf(false) }
+    
+    // Movie title for display
+    var movieTitle by remember { mutableStateOf<String?>(null) }
+    
+    // Reset episode end state when episode changes
+    LaunchedEffect(episodeId) {
+        hasEpisodeEnded = false
+    }
+    
+    // Fetch movie title
+    LaunchedEffect(movieId) {
+        if (movieId.isNotEmpty()) {
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                val movie = com.example.kisskh.data.AppRepository.getMovieDetails(movieId)
+                movieTitle = movie?.title
+            }
+        }
+    }
 
     var customView by remember { mutableStateOf<android.view.View?>(null) }
     var customViewCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
@@ -116,10 +141,21 @@ fun PlayerScreen(
     }
 
     // Save Progress on Exit
-    DisposableEffect(Unit) {
+    DisposableEffect(episodeId) {
         onDispose {
-            if (currentTime > 0) {
-                com.example.kisskh.data.LocalStorage.updateHistoryProgress(episodeId, currentTime.toLong(), duration.toLong())
+            // Don't save progress if episode has ended (we've already navigated to next episode)
+            if (currentTime > 0 && !hasEpisodeEnded) {
+                val episode = com.example.kisskh.data.model.Episode(
+                    id = episodeId,
+                    movieId = movieId,
+                    number = episodeNumber,
+                    title = episodeTitle,
+                    videoUrl = videoUrl,
+                    thumbnailUrl = null,
+                    timestamp = currentTime.toLong(),
+                    duration = duration.toLong()
+                )
+                com.example.kisskh.data.LocalStorage.updateHistoryProgress(episodeId, currentTime.toLong(), duration.toLong(), episode)
             }
         }
     }
@@ -194,6 +230,12 @@ fun PlayerScreen(
                              }
 
                             isBuffering = jsonObj.getInt("readyState") < 3
+                            
+                            // Detect episode end: currentTime >= duration - 1.0 (1 second threshold)
+                            if (!hasEpisodeEnded && duration > 1f && currentTime >= duration - 1.0f) {
+                                hasEpisodeEnded = true
+                                onNextEpisode?.invoke(movieId, episodeNumber)
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -332,7 +374,22 @@ fun PlayerScreen(
                     )
                 } else {
                     // ExoPlayer fallback (Native)
-                    VideoPlayerNative(videoUrl, context)
+                    VideoPlayerNative(
+                        videoUrl = videoUrl,
+                        context = context,
+                        movieId = movieId,
+                        episodeNumber = episodeNumber,
+                        onNextEpisode = onNextEpisode,
+                        onTimeUpdate = { time, dur ->
+                            currentTime = time
+                            duration = dur
+                            // Detect episode end: currentTime >= duration - 1.0 (1 second threshold)
+                            if (!hasEpisodeEnded && dur > 1f && time >= dur - 1.0f) {
+                                hasEpisodeEnded = true
+                                onNextEpisode?.invoke(movieId, episodeNumber)
+                            }
+                        }
+                    )
                 }
                 
                 // --- CUSTOM OVERLAY ---
@@ -342,6 +399,8 @@ fun PlayerScreen(
                         isPlaying = isPlaying,
                         currentTime = currentTime,
                         duration = duration,
+                        showTitle = movieTitle,
+                        episodeNumber = episodeNumber,
                         onTogglePlay = {
                             if (isPlaying) {
                                 webViewRef?.evaluateJavascript("document.querySelector('video').pause()", null)
@@ -365,18 +424,54 @@ fun PlayerScreen(
                         onClose = onBack
                     )
                 } else {
-                   // Native ExoPlayer logs... (User wants overlay for web primarily)
+                   // Native ExoPlayer overlay
                    if (controlsVisible) {
-                       IconButton(
-                            onClick = onBack,
-                            modifier = Modifier
-                                .statusBarsPadding()
-                                .padding(16.dp)
-                                .align(Alignment.TopEnd)
-                                .background(Color.Black.copy(alpha = 0.5f), shape = androidx.compose.foundation.shape.CircleShape)
-                        ) {
-                            Icon(Icons.Filled.Close, "Close", tint = Color.White)
-                        }
+                       Box(
+                           modifier = Modifier
+                               .fillMaxSize()
+                               .background(Color.Black.copy(alpha = 0.4f))
+                       ) {
+                           // Show title and episode number in top left
+                           if (movieTitle != null || episodeNumber.isNotEmpty()) {
+                               Column(
+                                   modifier = Modifier
+                                       .statusBarsPadding()
+                                       .padding(16.dp)
+                                       .align(Alignment.TopStart)
+                               ) {
+                                   if (movieTitle != null) {
+                                       Text(
+                                           text = movieTitle!!,
+                                           color = Color.White,
+                                           fontSize = 16.sp,
+                                           fontWeight = FontWeight.Bold,
+                                           maxLines = 1,
+                                           overflow = TextOverflow.Ellipsis
+                                       )
+                                   }
+                                   if (episodeNumber.isNotEmpty()) {
+                                       Text(
+                                           text = "Episode $episodeNumber",
+                                           color = Color.White.copy(alpha = 0.8f),
+                                           fontSize = 14.sp,
+                                           maxLines = 1
+                                       )
+                                   }
+                               }
+                           }
+                           
+                           // Close button in top right
+                           IconButton(
+                                onClick = onBack,
+                                modifier = Modifier
+                                    .statusBarsPadding()
+                                    .padding(16.dp)
+                                    .align(Alignment.TopEnd)
+                                    .background(Color.Black.copy(alpha = 0.5f), shape = androidx.compose.foundation.shape.CircleShape)
+                            ) {
+                                Icon(Icons.Filled.Close, "Close", tint = Color.White)
+                            }
+                       }
                    }
                 }
             }
@@ -390,6 +485,8 @@ fun VideoControlsOverlay(
     isPlaying: Boolean,
     currentTime: Float,
     duration: Float,
+    showTitle: String?,
+    episodeNumber: String,
     onTogglePlay: () -> Unit,
     onSeek: (Float) -> Unit,
     onSeekForward: () -> Unit,
@@ -488,7 +585,36 @@ fun VideoControlsOverlay(
         ) {
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f))) {
                 
-                // Top controls
+                // Show title and episode number in top left
+                if (showTitle != null || episodeNumber.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(16.dp)
+                            .align(Alignment.TopStart)
+                    ) {
+                        if (showTitle != null) {
+                            Text(
+                                text = showTitle,
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (episodeNumber.isNotEmpty()) {
+                            Text(
+                                text = "Episode $episodeNumber",
+                                color = Color.White.copy(alpha = 0.8f),
+                                fontSize = 14.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+                
+                // Close button in top right
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier
@@ -560,12 +686,58 @@ fun VideoControlsOverlay(
 }
 
 @Composable
-fun VideoPlayerNative(videoUrl: String, context: android.content.Context) {
+fun VideoPlayerNative(
+    videoUrl: String,
+    context: android.content.Context,
+    movieId: String,
+    episodeNumber: String,
+    onNextEpisode: ((String, String) -> Unit)?,
+    onTimeUpdate: (Float, Float) -> Unit
+) {
     val exoPlayer = remember {
-        ExoPlayer.Builder(context).build().apply {
+        val player = ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(videoUrl))
             prepare()
             playWhenReady = true
+        }
+        
+        // Add listener to track playback position and detect end
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == androidx.media3.common.Player.STATE_READY) {
+                    val currentPos = player.currentPosition / 1000f // Convert ms to seconds
+                    val dur = player.duration / 1000f // Convert ms to seconds
+                    if (dur > 0) {
+                        onTimeUpdate(currentPos, dur)
+                    }
+                }
+            }
+            
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying && player.playbackState == androidx.media3.common.Player.STATE_READY) {
+                    val currentPos = player.currentPosition / 1000f
+                    val dur = player.duration / 1000f
+                    if (dur > 0) {
+                        onTimeUpdate(currentPos, dur)
+                    }
+                }
+            }
+        })
+        
+        player
+    }
+    
+    // Poll for position updates
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            if (exoPlayer.playbackState == androidx.media3.common.Player.STATE_READY) {
+                val currentPos = exoPlayer.currentPosition / 1000f
+                val dur = exoPlayer.duration / 1000f
+                if (dur > 0) {
+                    onTimeUpdate(currentPos, dur)
+                }
+            }
         }
     }
     

@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -19,8 +20,8 @@ fun MainScreen(
     onEpisodeClick: (com.example.kisskh.data.model.Episode) -> Unit
 ) {
     var selectedItem by remember { mutableStateOf(0) }
-    val items = listOf("Home", "Library")
-    val icons = listOf(Icons.Filled.Home, Icons.Filled.VideoLibrary)
+    val items = listOf("Library", "Browse", "Update")
+    val icons = listOf(Icons.Filled.VideoLibrary, Icons.Filled.Search, Icons.Filled.SystemUpdate)
 
     Scaffold(
         bottomBar = {
@@ -48,11 +49,12 @@ fun MainScreen(
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedItem) {
-                0 -> HomeScreen(onMovieClick = onMovieClick)
-                1 -> LibraryScreen(
+                0 -> LibraryScreen(
                     onMovieClick = onMovieClick,
                     onEpisodeClick = onEpisodeClick
                 )
+                1 -> HomeScreen(onMovieClick = onMovieClick)
+                2 -> UpdateScreen()
             }
         }
     }

@@ -25,6 +25,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.kisskh.data.LocalStorage
 import com.example.kisskh.data.model.Episode
 import com.example.kisskh.data.model.Movie
+import com.example.kisskh.ui.components.FocusableWrapper
 import com.example.kisskh.ui.theme.BackgroundColor
 import com.example.kisskh.ui.theme.White
 
@@ -33,7 +34,7 @@ fun LibraryScreen(
     onMovieClick: (String) -> Unit,
     onEpisodeClick: (Episode) -> Unit // Navigates to Player
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableStateOf(1) } // Default to History tab
     val tabs = listOf("Watchlist", "History")
 
     // Loads data every time screen is composed/tab changes
@@ -86,7 +87,7 @@ fun LibraryScreen(
             if (selectedTab == 0) {
                 // WATCHLIST
                 if (watchlist.isEmpty()) {
-                    EmptyState("No saved dramas yet.")
+                    EmptyState("No show is watchlisted yet. Start adding shows to your watchlist!")
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 100.dp),
@@ -102,7 +103,7 @@ fun LibraryScreen(
             } else {
                 // HISTORY
                 if (history.isEmpty()) {
-                    EmptyState("No watched episodes yet.")
+                    EmptyState("Start watching a show to see your history here.")
                 } else {
                     LazyColumn(
                         contentPadding = PaddingValues(16.dp),
@@ -129,42 +130,46 @@ fun EmptyState(message: String) {
 
 @Composable
 fun HistoryItem(episode: Episode, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .background(Color.DarkGray.copy(alpha = 0.3f))
+    FocusableWrapper(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.DarkGray.copy(alpha = 0.3f))
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(episode.title, color = White, fontWeight = FontWeight.Bold)
-                Text("Episode ${episode.number}", color = Color.Gray, fontSize = 12.sp)
-            }
-            Icon(
-                imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
-                contentDescription = "Play",
-                tint = White
-            )
-        }
-        
-        // Progress Bar
-        if (episode.duration > 0 && episode.timestamp > 0) {
-            val progress = (episode.timestamp.toFloat() / episode.duration.toFloat()).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(Color.Gray.copy(alpha = 0.5f))
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(episode.title, color = White, fontWeight = FontWeight.Bold)
+                    Text("Episode ${episode.number}", color = Color.Gray, fontSize = 12.sp)
+                }
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
+                    contentDescription = "Play",
+                    tint = White
+                )
+            }
+            
+            // Progress Bar
+            if (episode.duration > 0 && episode.timestamp > 0) {
+                val progress = (episode.timestamp.toFloat() / episode.duration.toFloat()).coerceIn(0f, 1f)
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(fraction = progress)
-                        .fillMaxHeight()
-                        .background(Color.Red)
-                )
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .background(Color.Gray.copy(alpha = 0.5f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(fraction = progress)
+                            .fillMaxHeight()
+                            .background(Color.Red)
+                    )
+                }
             }
         }
     }
