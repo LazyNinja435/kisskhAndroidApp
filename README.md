@@ -12,7 +12,7 @@ A native Android application for streaming Asian dramas and movies from KissKH.
 
 ## Download
 
-[**Download Latest APK**](https://github.com/LazyNinja435/kisskhAndroidApp/raw/main/kisskhAndroidApp.apk)
+[**Download Latest APK**](https://github.com/LazyNinja435/kisskhAndroidApp/releases/latest)
 
 ## Installation
 
