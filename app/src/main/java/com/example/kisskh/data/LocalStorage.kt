@@ -96,7 +96,13 @@ object LocalStorage {
         
         if (index != -1) {
             val oldEpisode = list[index]
-            val newEpisode = oldEpisode.copy(timestamp = timestamp, duration = duration)
+            // Preserve movieTitle from old episode if new one doesn't have it, otherwise use new one
+            val movieTitle = episode?.movieTitle ?: oldEpisode.movieTitle
+            val newEpisode = oldEpisode.copy(
+                timestamp = timestamp,
+                duration = duration,
+                movieTitle = movieTitle
+            )
             
             // Remove current episode first to avoid index shifting issues
             list.removeAt(index)

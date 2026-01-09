@@ -134,7 +134,8 @@ fun PlayerScreen(
                     title = episodeTitle,
                     videoUrl = videoUrl,
                     thumbnailUrl = null,
-                    timestamp = resumeTime
+                    timestamp = resumeTime,
+                    movieTitle = movieTitle
                 )
             )
         }
@@ -153,7 +154,8 @@ fun PlayerScreen(
                     videoUrl = videoUrl,
                     thumbnailUrl = null,
                     timestamp = currentTime.toLong(),
-                    duration = duration.toLong()
+                    duration = duration.toLong(),
+                    movieTitle = movieTitle
                 )
                 com.example.kisskh.data.LocalStorage.updateHistoryProgress(episodeId, currentTime.toLong(), duration.toLong(), episode)
             }

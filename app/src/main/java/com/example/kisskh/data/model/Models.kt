@@ -21,7 +21,8 @@ data class Episode(
     val videoUrl: String,
     val thumbnailUrl: String? = null,
     val timestamp: Long = 0, // Position in milliseconds or seconds (saved locally)
-    val duration: Long = 0 // Duration in same units as timestamp
+    val duration: Long = 0, // Duration in same units as timestamp
+    val movieTitle: String? = null // Show/movie title for display in history
 )
 
 data class Category(

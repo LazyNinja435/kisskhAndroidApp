@@ -144,8 +144,16 @@ fun HistoryItem(episode: Episode, onClick: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(episode.title, color = White, fontWeight = FontWeight.Bold)
-                    Text("Episode ${episode.number}", color = Color.Gray, fontSize = 12.sp)
+                    Text(
+                        text = episode.movieTitle ?: episode.title,
+                        color = White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Episode ${episode.number}",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
                 }
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Filled.PlayArrow,
