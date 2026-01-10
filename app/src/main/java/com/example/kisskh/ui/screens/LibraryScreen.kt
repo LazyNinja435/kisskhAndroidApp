@@ -22,12 +22,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.rememberAsyncImagePainter
+import com.example.kisskh.data.AppRepository
 import com.example.kisskh.data.LocalStorage
 import com.example.kisskh.data.model.Episode
 import com.example.kisskh.data.model.Movie
 import com.example.kisskh.ui.components.FocusableWrapper
 import com.example.kisskh.ui.theme.BackgroundColor
 import com.example.kisskh.ui.theme.White
+import kotlinx.coroutines.launch
 
 @Composable
 fun LibraryScreen(
@@ -40,10 +42,37 @@ fun LibraryScreen(
     // Loads data every time screen is composed/tab changes
     var watchlist by remember { mutableStateOf<List<Movie>>(emptyList()) }
     var history by remember { mutableStateOf<List<Episode>>(emptyList()) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         watchlist = LocalStorage.getWatchlist()
         history = LocalStorage.getHistory()
+        
+        // Backfill missing movie titles for episodes in history
+        scope.launch {
+            val updatedHistory = history.toMutableList()
+            var needsUpdate = false
+            
+            for (i in updatedHistory.indices) {
+                val episode = updatedHistory[i]
+                if (episode.movieTitle == null && episode.movieId.isNotEmpty()) {
+                    try {
+                        val movie = com.example.kisskh.data.AppRepository.getMovieDetails(episode.movieId)
+                        if (movie != null) {
+                            updatedHistory[i] = episode.copy(movieTitle = movie.title)
+                            LocalStorage.updateEpisodeMovieTitle(episode.id, movie.title)
+                            needsUpdate = true
+                        }
+                    } catch (e: Exception) {
+                        // Silently fail - will try again next time
+                    }
+                }
+            }
+            
+            if (needsUpdate) {
+                history = updatedHistory
+            }
+        }
     }
 
     Column(
