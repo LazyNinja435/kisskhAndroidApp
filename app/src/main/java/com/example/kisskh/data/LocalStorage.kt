@@ -61,12 +61,6 @@ object LocalStorage {
     }
 
     fun addToHistory(episode: Episode) {
-        // Only add if watched for more than 5 seconds
-        if (episode.timestamp <= 5) {
-            // Don't modify history if episode hasn't been watched enough
-            return
-        }
-        
         val list = getHistory().toMutableList()
         // Remove existing entry for this episode if any (to update position to top)
         list.removeAll { it.id == episode.id }
@@ -86,11 +80,6 @@ object LocalStorage {
     }
 
     fun updateHistoryProgress(episodeId: String, timestamp: Long, duration: Long, episode: Episode? = null) {
-        // Only update if watched for more than 5 seconds
-        if (timestamp <= 5) {
-            return
-        }
-        
         val list = getHistory().toMutableList()
         val index = list.indexOfFirst { it.id == episodeId }
         
@@ -115,7 +104,7 @@ object LocalStorage {
             
             prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
         } else if (episode != null) {
-            // Episode not in history yet but watched >5s, and we have full episode data
+            // Episode not in history yet, and we have full episode data
             // Remove any other episode from the same show (same movieId)
             list.removeAll { it.movieId == episode.movieId }
             
@@ -129,6 +118,19 @@ object LocalStorage {
             }
             
             prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
+        }
+    }
+    
+    fun updateEpisodeMovieTitle(episodeId: String, movieTitle: String) {
+        val list = getHistory().toMutableList()
+        val index = list.indexOfFirst { it.id == episodeId }
+        if (index != -1) {
+            val episode = list[index]
+            if (episode.movieTitle == null) {
+                val updatedEpisode = episode.copy(movieTitle = movieTitle)
+                list[index] = updatedEpisode
+                prefs.edit().putString(KEY_HISTORY, gson.toJson(list)).apply()
+            }
         }
     }
 }

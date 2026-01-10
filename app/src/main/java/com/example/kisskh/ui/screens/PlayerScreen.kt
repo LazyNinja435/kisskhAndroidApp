@@ -140,12 +140,44 @@ fun PlayerScreen(
             )
         }
     }
+    
+    // Update history with movie title once it's fetched
+    LaunchedEffect(movieTitle) {
+        val title = movieTitle
+        if (title != null && episodeId.isNotEmpty()) {
+            com.example.kisskh.data.LocalStorage.updateEpisodeMovieTitle(episodeId, title)
+        }
+    }
 
+    // Periodically save progress while watching (every 10 seconds)
+    LaunchedEffect(episodeId, hasEpisodeEnded) {
+        if (episodeId.isNotEmpty() && !hasEpisodeEnded) {
+            while (true) {
+                delay(10000) // Save every 10 seconds
+                // Check state again inside the loop
+                if (hasEpisodeEnded) break
+                val title = movieTitle
+                val episode = com.example.kisskh.data.model.Episode(
+                    id = episodeId,
+                    movieId = movieId,
+                    number = episodeNumber,
+                    title = episodeTitle,
+                    videoUrl = videoUrl,
+                    thumbnailUrl = null,
+                    timestamp = currentTime.toLong(),
+                    duration = duration.toLong(),
+                    movieTitle = title
+                )
+                com.example.kisskh.data.LocalStorage.updateHistoryProgress(episodeId, currentTime.toLong(), duration.toLong(), episode)
+            }
+        }
+    }
+    
     // Save Progress on Exit
     DisposableEffect(episodeId) {
         onDispose {
             // Don't save progress if episode has ended (we've already navigated to next episode)
-            if (currentTime > 0 && !hasEpisodeEnded) {
+            if (!hasEpisodeEnded) {
                 val episode = com.example.kisskh.data.model.Episode(
                     id = episodeId,
                     movieId = movieId,

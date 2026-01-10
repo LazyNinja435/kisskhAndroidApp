@@ -103,7 +103,10 @@ object UpdateRepository {
             
             // Parse version from tag (e.g., "v1.1" or "1.1")
             val versionCode = parseVersionCodeFromTag(tagName)
-            val versionName = tagName.removePrefix("v")
+            val versionName = tagName.removePrefix("v").removePrefix("V")
+            
+            // Get current version name for comparison
+            val currentVersionName = getCurrentVersionName(context)
             
             // Find APK asset
             var downloadUrl: String? = null
@@ -118,7 +121,10 @@ object UpdateRepository {
                 }
             }
             
-            val isUpdateAvailable = versionCode > currentVersionCode
+            // Check if update is available:
+            // 1. Version names must be different (if same, no update)
+            // 2. If version names differ, check if version code is higher
+            val isUpdateAvailable = versionName != currentVersionName && versionCode > currentVersionCode
             
             UpdateInfo(
                 isUpdateAvailable = isUpdateAvailable,
